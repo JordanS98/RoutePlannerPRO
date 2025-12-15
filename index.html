@@ -477,11 +477,12 @@ function parseLocationInput(val) {
     val = val.trim().toLowerCase();
     let detectedCountry = null;
     let query = val;
-
-    // Najpierw spróbuj rozpoznać i wyciągnąć kod kraju z początku lub końca (np. "nl 6041", "6041 nl")
+    
+    // Usunięto wszystkie stare reguły dla Holandii
+    // Teraz tylko podstawowe rozpoznawanie kraju
     const prefixMatch = val.match(/^([a-zA-Z]{2})[\s\-\/]*(.*)$/);
     const suffixMatch = val.match(/^(.*?)[\s\-\/]*([a-zA-Z]{2})$/);
-
+    
     if (prefixMatch && EURO_CODES.includes(prefixMatch[1].toLowerCase())) {
         detectedCountry = prefixMatch[1].toLowerCase();
         query = prefixMatch[2];
@@ -489,66 +490,94 @@ function parseLocationInput(val) {
         detectedCountry = suffixMatch[2].toLowerCase();
         query = suffixMatch[1];
     }
+    
+    return { country: detectedCountry, q: query };
+}
 
-    // Teraz sprawdź, czy pozostałe zapytanie to 4 cyfry (holenderski kod pocztowy)
-    // Uwzględnij również przypadek, gdy użytkownik wpisał tylko 4 cyfry (bez kraju)
-    const justDigits = query.replace(/\D/g, '');
-    const isFourDigitPostalCode = /^\d{4}$/.test(justDigits);
-
-    if (isFourDigitPostalCode) {
-        // Jeśli wykryto 4 cyfry i kraj to Holandia (lub nie podano kraju) - traktuj to jako kod pocztowy
-        if (detectedCountry === 'nl' || detectedCountry === null) {
-            return { country: 'nl', q: justDigits, isPostalCode: true };
+// NOWA FUNKCJA SPECJALNIE DLA HOLANDII
+function normalizeDutchPostalCode(input) {
+    // Usuń wszystkie spacje, myślniki i zamień na małe litery
+    input = input.toLowerCase().replace(/[\s\-]/g, '');
+    
+    // Jeśli zaczyna się od "nl" (kod kraju), usuń go
+    if (input.startsWith('nl')) {
+        input = input.substring(2);
+    }
+    
+    // Jeśli kończy się na "nl" (kod kraju), usuń go
+    if (input.endsWith('nl')) {
+        input = input.substring(0, input.length - 2);
+    }
+    
+    // Teraz mamy tylko cyfry (i ewentualnie litery)
+    // Rozpoznaj format holenderskiego kodu pocztowego: 4 cyfry + 2 litery
+    const match = input.match(/^(\d{4})([a-z]{0,2})$/);
+    
+    if (match) {
+        const digits = match[1];
+        let letters = match[2] || '';
+        
+        // Jeśli brakuje liter, dodaj "aa" jako domyślne (najczęściej występuje)
+        if (letters.length === 0) {
+            letters = 'aa';
         }
+        // Jeśli jest tylko 1 litera, dodaj drugą "a"
+        else if (letters.length === 1) {
+            letters = letters + 'a';
+        }
+        
+        // Zwróć pełny format: 4 cyfry + 2 litery (wielkimi literami)
+        return digits + letters.toUpperCase();
     }
-
-    // Dla 4-cyfrowych kodów bez kraju, traktuj jako priorytet dla NL, BE, LU, CH, AT (jak wcześniej)
-    const postalMatch4 = val.match(/^(\d{4})$/);
-    const postalMatch5 = val.match(/^(\d{5})$/);
-
-    if (postalMatch4) {
-        detectedCountry = 'postal_priority_4';
-        query = val;
-    } else if (postalMatch5) {
-        detectedCountry = 'postal_priority_5';
-        query = val;
-    }
-
-    return { country: detectedCountry, q: query, isPostalCode: false };
+    
+    // Jeśli to nie jest holenderski kod, zwróć oryginalne zapytanie
+    return input;
 }
 
 async function tryGeocodeByValue(val) {
   if (!val || val.trim().length < 2) return null;
+  
+  // Sprawdź cache (pamięć podręczną)
   const cacheKey = val.toLowerCase();
   if(geoCache[cacheKey]) return geoCache[cacheKey];
-
+  
   try {
     const parsed = parseLocationInput(val);
     let apiUrl;
-
-    // SPECJALNA OBSŁUGA DLA HOLENDERSKICH KODÓW POCZTOWYCH
-    if (parsed.isPostalCode && parsed.country === 'nl') {
-      // Użyj parametru postalcode dla precyzyjnego wyszukiwania kodów pocztowych
-      apiUrl = `https://nominatim.openstreetmap.org/search?format=json&limit=1&addressdetails=1&postalcode=${encodeURIComponent(parsed.q)}&countrycodes=nl`;
+    
+    // SPECJALNA OBSŁUGA TYLKO DLA HOLANDII
+    // Jeśli kraj to Holandia (nl) lub nie podano kraju, ale wpis wygląda jak kod pocztowy
+    if (parsed.country === 'nl' || (!parsed.country && /^\s*(nl\s*)?\d{4}/i.test(val))) {
+      // Normalizuj kod pocztowy - zamień na pełny format
+      const normalizedCode = normalizeDutchPostalCode(val);
+      
+      // Dla holenderskich kodów pocztowych używamy specjalnego zapytania
+      // z parametrem postalcode i countrycodes=nl
+      apiUrl = `https://nominatim.openstreetmap.org/search?format=json&limit=1&addressdetails=1&postalcode=${encodeURIComponent(normalizedCode)}&countrycodes=nl`;
+      
+      console.log('Szukam holenderskiego kodu pocztowego:', normalizedCode, 'URL:', apiUrl);
     } 
-    // Standardowa logika dla innych przypadków
-    else if (parsed.country === 'postal_priority_4') {
-      apiUrl = `https://nominatim.openstreetmap.org/search?format=json&limit=1&addressdetails=1&q=${encodeURIComponent(parsed.q)}&countrycodes=nl,be,lu,ch,at`;
-    } else if (parsed.country === 'postal_priority_5') {
-      apiUrl = `https://nominatim.openstreetmap.org/search?format=json&limit=1&addressdetails=1&q=${encodeURIComponent(parsed.q)}&countrycodes=pl,de,fr,es,it`;
-    } else if (parsed.country) {
+    // Standardowa logika dla innych krajów
+    else if (parsed.country) {
       apiUrl = `https://nominatim.openstreetmap.org/search?format=json&limit=1&addressdetails=1&q=${encodeURIComponent(parsed.q)}&countrycodes=${parsed.country}`;
     } else {
       apiUrl = `https://nominatim.openstreetmap.org/search?format=json&limit=1&addressdetails=1&q=${encodeURIComponent(parsed.q)}&countrycodes=${EURO_CODES_STR}`;
     }
-
+    
     const r = await fetch(apiUrl);
     const arr = await r.json();
+    
     if(arr[0]) { 
+      console.log('Znaleziono wynik:', arr[0].display_name);
       geoCache[cacheKey] = arr[0]; 
       return arr[0]; 
+    } else {
+      console.log('Brak wyników dla:', val);
     }
-  } catch(e){ console.error(e); }
+  } catch(e){ 
+    console.error('Błąd geokodowania:', e); 
+  }
+  
   return null;
 }
 
@@ -580,23 +609,19 @@ function setupAutocomplete(input) {
     try {
       const parsed = parseLocationInput(val);
       let apiUrl;
-
-      // SPECJALNA OBSŁUGA AUTOCOMPLETE DLA KODÓW POCZTOWYCH
-      if (parsed.isPostalCode && parsed.country === 'nl') {
-        // Dla kodów pocztowych również używamy parametru postalcode
-        apiUrl = `https://nominatim.openstreetmap.org/search?format=json&limit=5&addressdetails=1&postalcode=${encodeURIComponent(parsed.q)}&countrycodes=nl`;
+      
+      // SPECJALNA OBSŁUGA AUTOCOMPLETE DLA HOLANDII
+      if (parsed.country === 'nl' || (!parsed.country && /^\s*(nl\s*)?\d{4}/i.test(val))) {
+        const normalizedCode = normalizeDutchPostalCode(val);
+        apiUrl = `https://nominatim.openstreetmap.org/search?format=json&limit=5&addressdetails=1&postalcode=${encodeURIComponent(normalizedCode)}&countrycodes=nl`;
       }
       // Standardowa logika dla innych przypadków
-      else if (parsed.country === 'postal_priority_4') {
-        apiUrl = `https://nominatim.openstreetmap.org/search?format=json&limit=5&addressdetails=1&q=${encodeURIComponent(parsed.q)}&countrycodes=nl,be,lu,ch,at`;
-      } else if (parsed.country === 'postal_priority_5') {
-        apiUrl = `https://nominatim.openstreetmap.org/search?format=json&limit=5&addressdetails=1&q=${encodeURIComponent(parsed.q)}&countrycodes=pl,de,fr,es,it`;
-      } else if (parsed.country) {
+      else if (parsed.country) {
         apiUrl = `https://nominatim.openstreetmap.org/search?format=json&limit=5&addressdetails=1&q=${encodeURIComponent(parsed.q)}&countrycodes=${parsed.country}`;
       } else {
         apiUrl = `https://nominatim.openstreetmap.org/search?format=json&limit=5&addressdetails=1&q=${encodeURIComponent(parsed.q)}&countrycodes=${EURO_CODES_STR}`;
       }
-
+      
       const resp = await fetch(apiUrl);
       const results = await resp.json();
       
@@ -612,10 +637,11 @@ function setupAutocomplete(input) {
         };
         dropdown.appendChild(div);
       });
+      
       if (results.length) dropdown.style.display = 'block';
     } catch(e){ console.error(e); }
   }), 300);
-
+  
   // Hide on click outside
   document.addEventListener('click', e => { if (!wrapper.contains(e.target)) dropdown.style.display = 'none'; });
 }
@@ -690,7 +716,12 @@ async function updateRoute(){
     const inp = inputs[i];
     if(inp.value && (!inp.dataset.lat || !inp.dataset.lon)) {
         const geo = await tryGeocodeByValue(inp.value);
-        if(geo) { inp.dataset.lat = geo.lat; inp.dataset.lon = geo.lon; inp.value = geo.display_name; inp.style.borderColor="var(--success)"; }
+        if(geo) { 
+          inp.dataset.lat = geo.lat; 
+          inp.dataset.lon = geo.lon; 
+          inp.value = geo.display_name; 
+          inp.style.borderColor="var(--success)"; 
+        }
     }
     const lat = inp.dataset.lat, lon = inp.dataset.lon;
     if (!lat || !lon) { missing.push(i+1); continue; }

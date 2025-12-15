@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>RoutePlanner PRO v2.6 | Fixed Layout</title>
+<title>RoutePlanner PRO v2.8 | NL Fix</title>
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
@@ -70,7 +70,6 @@ body { font-family: 'Inter', sans-serif; margin: 0; padding: 0; background-color
 .scroll-area::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 3px; }
 
 /* --- SIDEBAR: SUMMARY CARD (FIXED BOTTOM) --- */
-/* To jest teraz przypięte do dołu panelu bocznego */
 .summary-container {
     padding: 0; 
     background: var(--secondary);
@@ -78,7 +77,6 @@ body { font-family: 'Inter', sans-serif; margin: 0; padding: 0; background-color
     flex-shrink: 0; /* Nie kurczy się */
     display: flex;
     flex-direction: column;
-    /* Max height np 45% ekranu, żeby nie zasłoniło wszystkiego na małym laptopie */
     max-height: 45vh; 
     border-top: 4px solid var(--primary);
 }
@@ -228,7 +226,6 @@ input:checked + .slider:before { transform: translateX(18px); }
     #tab-tacho { display: block !important; }
     body, #app-container { height: auto; overflow: visible; display: block; }
     .map-wrapper { height: 400px; border: 1px solid #ccc; margin-bottom: 20px; }
-    /* Fix for summary card in print */
     .summary-container { 
         display: block; 
         background: white; 
@@ -261,7 +258,7 @@ input:checked + .slider:before { transform: translateX(18px); }
         <div class="logo-area">
             <div>
                 <h1>RoutePlanner <span style="color:var(--accent)">PRO</span></h1>
-                <small>v2.6 by Sztuba</small>
+                <small>v2.8 by Sztuba</small>
             </div>
             <button class="btn-secondary" onclick="window.print()" title="Drukuj / PDF" style="padding: 8px;"><i class="fa-solid fa-print"></i></button>
         </div>
@@ -834,15 +831,15 @@ function attachRouteDragHandlers(polyline){
   const onMd = (e) => { isRouteDragActive = true; draggingMap = map.dragging.enabled(); if(draggingMap) map.dragging.disable(); if(!tempDragMarker) tempDragMarker=L.circleMarker(e.latlng,{radius:8,color:'var(--accent)',fillColor:'white',fillOpacity:1}).addTo(map); else tempDragMarker.setLatLng(e.latlng); L.DomEvent.stopPropagation(e); };
   const onMm = (e) => { if(isRouteDragActive && tempDragMarker) tempDragMarker.setLatLng(e.latlng); };
   const onMu = async (e) => {
-     if(!isRouteDragActive) return; isRouteDragActive=false; if(draggingMap) map.dragging.enable();
-     const ll = tempDragMarker.getLatLng(); map.removeLayer(tempDragMarker); tempDragMarker=null;
-     const inputs = Array.from(document.querySelectorAll('.punktInput'));
-     const wps = []; inputs.forEach(inp=>{ if(inp.dataset.lat) wps.push([parseFloat(inp.dataset.lat), parseFloat(inp.dataset.lon)]); });
-     let best=0, min=Infinity;
-     for(let i=0; i<wps.length-1; i++){ const d=pointToSegmentDistance(ll, wps[i], wps[i+1]); if(d<min){min=d; best=i;} }
-     const name = await reverseGeocode(ll.lat, ll.lng);
-     insertPunktInputAt(best+1, ll.lat, ll.lng, name);
-     setTimeout(updateRoute, 200);
+      if(!isRouteDragActive) return; isRouteDragActive=false; if(draggingMap) map.dragging.enable();
+      const ll = tempDragMarker.getLatLng(); map.removeLayer(tempDragMarker); tempDragMarker=null;
+      const inputs = Array.from(document.querySelectorAll('.punktInput'));
+      const wps = []; inputs.forEach(inp=>{ if(inp.dataset.lat) wps.push([parseFloat(inp.dataset.lat), parseFloat(inp.dataset.lon)]); });
+      let best=0, min=Infinity;
+      for(let i=0; i<wps.length-1; i++){ const d=pointToSegmentDistance(ll, wps[i], wps[i+1]); if(d<min){min=d; best=i;} }
+      const name = await reverseGeocode(ll.lat, ll.lng);
+      insertPunktInputAt(best+1, ll.lat, ll.lng, name);
+      setTimeout(updateRoute, 200);
   };
   window._rMm=onMm; window._rMu=onMu;
   polyline.on('mousedown', onMd); map.on('mousemove', onMm); map.on('mouseup', onMu);

@@ -1,0 +1,1022 @@
+<!DOCTYPE html>
+<html lang="pl">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>RoutePlanner PRO v2.6 | Fixed Layout</title>
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+
+<style>
+/* --- VARIABLES & RESET --- */
+:root {
+    --primary: #2563eb;
+    --primary-dark: #1e40af;
+    --secondary: #0f172a;
+    --accent: #f59e0b;
+    --danger: #ef4444;
+    --success: #22c55e;
+    --bg-light: #f1f5f9;
+    --surface: #ffffff;
+    --border: #e2e8f0;
+    --text-main: #334155;
+    --text-muted: #64748b;
+    --shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+}
+
+body { font-family: 'Inter', sans-serif; margin: 0; padding: 0; background-color: var(--bg-light); color: var(--text-main); height: 100vh; overflow: hidden; display: flex; }
+* { box-sizing: border-box; outline: none; }
+
+/* --- LAYOUT STRUCTURE --- */
+#app-container { display: flex; width: 100%; height: 100%; }
+
+/* SIDEBAR - FLEX CONTAINER */
+.sidebar { 
+    width: 420px; 
+    background: var(--surface); 
+    border-right: 1px solid var(--border); 
+    display: flex; 
+    flex-direction: column; /* Układ pionowy */
+    z-index: 1000; 
+    box-shadow: var(--shadow); 
+    height: 100vh; /* Pełna wysokość */
+}
+
+.main-content { flex: 1; position: relative; display: flex; flex-direction: column; }
+.map-wrapper { flex: 1; position: relative; z-index: 1; }
+
+/* --- SIDEBAR: HEADER (FIXED TOP) --- */
+.logo-area { 
+    padding: 15px 20px; 
+    background: var(--secondary); 
+    color: white; 
+    display: flex; 
+    justify-content: space-between; 
+    align-items: center; 
+    flex-shrink: 0; /* Nie kurczy się */
+}
+.logo-area h1 { margin: 0; font-size: 18px; font-weight: 700; letter-spacing: 0.5px; }
+.logo-area small { opacity: 0.7; font-size: 11px; font-weight: 400; display: block; }
+
+/* --- SIDEBAR: SCROLLABLE INPUTS AREA (MIDDLE) --- */
+.scroll-area { 
+    flex: 1; /* Zajmuje całą dostępną przestrzeń środkową */
+    overflow-y: auto; /* Przewija się, gdy punktów jest dużo */
+    padding: 20px; 
+    border-bottom: 1px solid var(--border);
+}
+.scroll-area::-webkit-scrollbar { width: 6px; }
+.scroll-area::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 3px; }
+
+/* --- SIDEBAR: SUMMARY CARD (FIXED BOTTOM) --- */
+/* To jest teraz przypięte do dołu panelu bocznego */
+.summary-container {
+    padding: 0; 
+    background: var(--secondary);
+    color: white;
+    flex-shrink: 0; /* Nie kurczy się */
+    display: flex;
+    flex-direction: column;
+    /* Max height np 45% ekranu, żeby nie zasłoniło wszystkiego na małym laptopie */
+    max-height: 45vh; 
+    border-top: 4px solid var(--primary);
+}
+
+.summary-header {
+    padding: 15px 20px 5px 20px;
+}
+
+.summary-row { display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 5px; }
+.big-stat { font-size: 26px; font-weight: 700; color: #fff; }
+.sub-stat { font-size: 13px; opacity: 0.8; }
+
+/* LISTA ODCINKÓW - WEWNĘTRZNY SCROLL */
+.segment-list {
+    flex: 1; /* Rozciąga się w dostępnym miejscu */
+    overflow-y: auto; /* Scrolluje się tylko ta lista */
+    margin: 5px 0;
+    padding: 5px 20px;
+    border-top: 1px solid rgba(255,255,255,0.1);
+    border-bottom: 1px solid rgba(255,255,255,0.1);
+    font-size: 12px;
+    background: rgba(0,0,0,0.1);
+    min-height: 60px; /* Minimalna wysokość listy */
+}
+.segment-list::-webkit-scrollbar { width: 4px; }
+.segment-list::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.2); border-radius: 2px; }
+
+.segment-row { display: flex; justify-content: space-between; padding: 4px 0; color: rgba(255,255,255,0.8); border-bottom: 1px solid rgba(255,255,255,0.05); }
+.segment-row:last-child { border-bottom: none; }
+.segment-row span:last-child { font-weight: 600; color: #fff; }
+
+/* STOPKA Z KOSZTAMI - ZAWSZE NA DOLE KARTY */
+.summary-footer {
+    padding: 10px 20px 15px 20px;
+    background: rgba(255,255,255,0.05);
+}
+.cost-display { 
+    color: var(--accent); font-size: 24px; font-weight: 700; text-align: right; margin-top: 5px; 
+}
+
+/* --- INPUTS & FORMS --- */
+.form-group { margin-bottom: 15px; position: relative; }
+label { font-size: 11px; font-weight: 600; color: var(--text-muted); text-transform: uppercase; margin-bottom: 6px; display: block; }
+input, select { 
+    width: 100%; padding: 10px 12px; border: 1px solid var(--border); border-radius: 6px; 
+    font-size: 14px; color: var(--secondary); transition: 0.2s; background: #fff;
+}
+input:focus { border-color: var(--primary); box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.1); }
+
+/* --- POINTS LIST --- */
+.punkty-container { 
+    background: #fff; border: 1px solid var(--border); border-radius: 6px; padding: 10px; margin-bottom: 10px; 
+    display: flex; flex-direction: column; gap: 5px; position: relative; transition: 0.2s;
+}
+.punkty-container:hover { border-color: #cbd5e1; box-shadow: 0 2px 5px rgba(0,0,0,0.03); }
+.drag-handle { cursor: grab; color: #94a3b8; margin-right: 8px; }
+.input-row { display: flex; align-items: center; }
+.btn-remove { 
+    background: transparent; color: var(--danger); border: none; font-size: 16px; cursor: pointer; 
+    padding: 0 0 0 10px; opacity: 0.6; transition: 0.2s; 
+}
+.btn-remove:hover { opacity: 1; }
+
+/* --- AUTOCOMPLETE --- */
+.autocomplete-suggestions { 
+    border: 1px solid var(--border); border-radius: 0 0 6px 6px; max-height: 200px; overflow-y: auto; 
+    position: absolute; background: white; width: calc(100% - 20px); left: 10px; top: 100%; z-index: 9999; 
+    box-shadow: var(--shadow);
+}
+.autocomplete-suggestion { padding: 10px; cursor: pointer; font-size: 13px; border-bottom: 1px solid #f1f5f9; }
+.autocomplete-suggestion:hover { background: #eff6ff; color: var(--primary); }
+
+/* --- ACTION BUTTONS --- */
+.btn-group { display: flex; gap: 10px; margin-bottom: 20px; }
+.btn { 
+    flex: 1; padding: 12px; border: none; border-radius: 6px; font-weight: 600; font-size: 13px; 
+    cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 8px; transition: 0.2s;
+}
+.btn-primary { background: var(--primary); color: white; }
+.btn-primary:hover { background: var(--primary-dark); }
+.btn-secondary { background: white; border: 1px solid var(--border); color: var(--text-main); }
+.btn-secondary:hover { background: #f8fafc; border-color: #cbd5e1; }
+.btn-success { background: var(--success); color: white; }
+.btn-success:hover { background: #16a34a; }
+
+/* --- TOGGLE SWITCH --- */
+.toggle-switch { display: flex; align-items: center; cursor: pointer; user-select: none; margin-bottom: 20px; }
+.toggle-switch input { display: none; }
+.slider { 
+    position: relative; width: 40px; height: 22px; background-color: #cbd5e1; 
+    border-radius: 20px; margin-right: 12px; transition: .3s; 
+}
+.slider:before { 
+    content: ""; position: absolute; height: 16px; width: 16px; left: 3px; bottom: 3px; 
+    background-color: white; border-radius: 50%; transition: .3s; box-shadow: 0 2px 4px rgba(0,0,0,0.2);
+}
+input:checked + .slider { background-color: var(--primary); }
+input:checked + .slider:before { transform: translateX(18px); }
+
+/* --- BOTTOM DRAWER (TACHO & SETTINGS) --- */
+.bottom-drawer {
+    background: var(--surface); border-top: 1px solid var(--border); 
+    height: 320px; display: flex; flex-direction: column;
+    position: relative; z-index: 2000;
+}
+.drawer-header {
+    padding: 0 20px; border-bottom: 1px solid var(--border); background: #f8fafc;
+    display: flex; align-items: center; gap: 20px; height: 50px;
+}
+.tab-btn {
+    background: none; border: none; padding: 0 10px; height: 50px; cursor: pointer;
+    font-size: 13px; font-weight: 600; color: var(--text-muted); border-bottom: 2px solid transparent;
+}
+.tab-btn.active { color: var(--primary); border-bottom-color: var(--primary); }
+.tab-btn:hover { color: var(--text-main); }
+
+.drawer-content { flex: 1; overflow-y: auto; padding: 20px; background: #fff; }
+.tab-pane { display: none; }
+.tab-pane.active { display: block; animation: fadeIn 0.2s; }
+
+/* --- SETTINGS GRID --- */
+.settings-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 20px; }
+.settings-group { background: #f8fafc; padding: 15px; border-radius: 6px; border: 1px solid var(--border); }
+.settings-group h4 { margin: 0 0 10px 0; font-size: 12px; color: var(--primary); text-transform: uppercase; }
+
+/* --- TACHO LOG VISUAL --- */
+.tacho-timeline { font-family: 'Consolas', monospace; font-size: 12px; }
+.log-entry { padding: 8px 10px; border-left: 3px solid #cbd5e1; margin-bottom: 4px; background: #f8fafc; display: flex; justify-content: space-between; align-items: center; }
+.log-entry.drive { border-left-color: var(--primary); background: #eff6ff; }
+.log-entry.rest { border-left-color: var(--success); background: #f0fdf4; }
+.log-entry.bill { border-left-color: var(--accent); background: #fffbeb; color: #b45309; font-weight: bold; border-bottom: 1px solid #fcd34d; }
+.log-entry.alert { border-left-color: var(--danger); background: #fef2f2; color: #991b1b; font-weight: bold; }
+
+/* --- ALERTS --- */
+.risk-alert { 
+    background: #fff7ed; border: 1px solid #fed7aa; border-left: 4px solid var(--accent); 
+    padding: 15px; border-radius: 6px; margin-top: 10px; color: #9a3412; font-size: 13px; 
+}
+.risk-alert.late { background: #fef2f2; border-color: #fecaca; border-left-color: var(--danger); color: #991b1b; }
+.risk-alert.high-risk { background: #fff1f2; border-color: #fda4af; border-left-color: #e11d48; color: #be123c; }
+
+/* --- PDF PRINT STYLE --- */
+@media print {
+    .sidebar, .drawer-header, .btn-group, .settings-grid { display: none !important; }
+    .bottom-drawer { height: auto; border: none; }
+    .drawer-content { overflow: visible; padding: 0; }
+    #tab-tacho { display: block !important; }
+    body, #app-container { height: auto; overflow: visible; display: block; }
+    .map-wrapper { height: 400px; border: 1px solid #ccc; margin-bottom: 20px; }
+    /* Fix for summary card in print */
+    .summary-container { 
+        display: block; 
+        background: white; 
+        color: black; 
+        border: 1px solid #ccc; 
+        max-height: none; 
+        width: 100%;
+    }
+    .big-stat, .cost-display { color: black; }
+    .segment-list { color: black; border: 1px solid #eee; background: white; max-height: none; overflow: visible; }
+    .segment-row { color: black; border-color: #eee; }
+    .segment-row span:last-child { color: black; }
+    .summary-footer { background: white; border-top: 1px solid #ccc; }
+}
+
+/* --- ANIMATIONS --- */
+@keyframes fadeIn { from { opacity: 0; transform: translateY(5px); } to { opacity: 1; transform: translateY(0); } }
+.loading-overlay { 
+    position: absolute; top:0; left:0; width:100%; height:100%; background:rgba(255,255,255,0.7); 
+    z-index: 5000; display:flex; justify-content:center; align-items:center; backdrop-filter: blur(2px);
+}
+.spinner { width: 40px; height: 40px; border: 4px solid #f3f3f3; border-top: 4px solid var(--primary); border-radius: 50%; animation: spin 1s linear infinite; }
+@keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+</style>
+</head>
+<body>
+
+<div id="app-container">
+    <div class="sidebar">
+        <div class="logo-area">
+            <div>
+                <h1>RoutePlanner <span style="color:var(--accent)">PRO</span></h1>
+                <small>v2.6 by Sztuba</small>
+            </div>
+            <button class="btn-secondary" onclick="window.print()" title="Drukuj / PDF" style="padding: 8px;"><i class="fa-solid fa-print"></i></button>
+        </div>
+
+        <div class="scroll-area">
+            <div id="punktyWrapper" class="sortable">
+                </div>
+
+            <div class="btn-group" style="margin-top: 15px;">
+                <button class="btn btn-secondary" onclick="dodajPunkt()"><i class="fa-solid fa-plus"></i> Dodaj Punkt</button>
+            </div>
+
+            <label class="toggle-switch">
+                <input type="checkbox" id="avoidCH">
+                <span class="slider"></span>
+                <span>Omijaj Szwajcarię (CH)</span>
+            </label>
+
+            <button class="btn btn-primary" style="width:100%" onclick="updateRoute()">
+                <i class="fa-solid fa-route"></i> Wyznacz Trasę & Oblicz
+            </button>
+        </div>
+
+        <div class="summary-container" id="mainSummary" style="display:none;">
+            <div class="summary-header">
+                <div class="summary-row">
+                    <span style="opacity:0.7">Dystans</span>
+                    <span style="opacity:0.7">Czas Jazdy</span>
+                </div>
+                <div class="summary-row">
+                    <div class="big-stat" id="displayTotalKm">0 km</div>
+                    <div class="big-stat" id="displayTotalTime">0h 0m</div>
+                </div>
+            </div>
+            
+            <div id="segmentList" class="segment-list">
+                </div>
+
+            <div class="summary-footer">
+                <div class="summary-row" style="font-size:13px;">
+                    <span>Suma dniówek: <b id="daysCostDisplay">0 €</b></span>
+                </div>
+                <div class="cost-display" id="totalCostDisplay">0.00 €</div>
+            </div>
+        </div>
+    </div>
+
+    <div class="main-content">
+        <div class="map-wrapper">
+            <div id="map" style="width: 100%; height: 100%;"></div>
+            <div id="loadingOverlay" class="loading-overlay" style="display:none;">
+                <div class="spinner"></div>
+            </div>
+        </div>
+
+        <div class="bottom-drawer">
+            <div class="drawer-header">
+                <button class="tab-btn active" onclick="switchTab('settings')"><i class="fa-solid fa-sliders"></i> Ustawienia & Koszty</button>
+                <button class="tab-btn" onclick="switchTab('cargo')"><i class="fa-solid fa-truck-ramp-box"></i> Załadunek / Rozładunek</button>
+                <button class="tab-btn" onclick="switchTab('tacho')"><i class="fa-solid fa-clock-rotate-left"></i> Harmonogram Pracy</button>
+                <div style="flex:1"></div>
+            </div>
+
+            <div class="drawer-content">
+                <div id="tab-settings" class="tab-pane active">
+                    <div class="settings-grid">
+                        <div class="settings-group">
+                            <h4><i class="fa-solid fa-coins"></i> Finanse (Fracht)</h4>
+                            <label>Stawka za km (€)</label>
+                            <input type="number" id="stawkaKm" value="0.70" step="0.01" onchange="saveSettings(); obliczAutomatycznie()">
+                            <label style="margin-top:8px">Stawka dzienna (€)</label>
+                            <input type="number" id="stawkaDzienna" value="450" step="1" onchange="saveSettings(); obliczAutomatycznie()">
+                        </div>
+                        
+                        <div class="settings-group">
+                            <h4><i class="fa-solid fa-bed"></i> Manualne Pauzy & Weekend</h4>
+                            <label>Pauza Weekend (h)</label>
+                            <input type="number" id="weekendPauza" value="24" step="1" oninput="obliczAutomatycznie()">
+                            <label style="margin-top:8px">Liczba ręcznych pauz</label>
+                            <input type="number" id="liczbaPauz" value="0" min="0" oninput="generujPauzy(); obliczAutomatycznie()">
+                            <div id="listaPauzContainer" style="display:flex; flex-wrap:wrap; gap:5px; margin-top:5px;"></div>
+                        </div>
+
+                        <div class="settings-group">
+                            <h4><i class="fa-solid fa-user-clock"></i> Limity Kierowcy</h4>
+                            <label>Czas jazdy DZIŚ (h)</label>
+                            <input type="number" id="pozostalyCzasDzien" value="9.0" step="0.1" max="10" oninput="obliczAutomatycznie()">
+                            <label style="margin-top:8px">Ilość "10h" w tyg.</label>
+                            <input type="number" id="liczba10hTyg" value="2" max="2" oninput="obliczAutomatycznie()">
+                        </div>
+                        
+                        <div class="settings-group">
+                            <h4><i class="fa-solid fa-calendar-week"></i> Jazda 2 Tygodnie</h4>
+                            <label>Limit 2 tyg. (max 90h)</label>
+                            <input type="number" id="jazda2tyg" value="80" max="90" oninput="obliczAutomatycznie()">
+                        </div>
+                    </div>
+                </div>
+
+                <div id="tab-cargo" class="tab-pane">
+                    <div class="settings-grid">
+                        <div class="settings-group">
+                            <h4><i class="fa-solid fa-boxes-packing"></i> Załadunek (Start)</h4>
+                            <label>Data</label>
+                            <input type="date" id="dataZaladunku" onchange="obliczAutomatycznie()">
+                            <label style="margin-top:8px">Godzina</label>
+                            <input type="time" id="godzinaZaladunku" value="12:00" oninput="obliczAutomatycznie()">
+                        </div>
+                        <div class="settings-group">
+                            <h4><i class="fa-solid fa-dolly"></i> Rozładunek (Cel)</h4>
+                            <label>Data (FIX)</label>
+                            <input type="date" id="dataRozladunku" onchange="obliczAutomatycznie()">
+                            <label style="margin-top:8px">Godzina (FIX)</label>
+                            <input type="time" id="godzinaRozladunku" value="08:00" oninput="obliczAutomatycznie()">
+                        </div>
+                    </div>
+                </div>
+
+                <div id="tab-tacho" class="tab-pane">
+                    <div style="display:flex; gap:20px;">
+                        <div style="flex:2">
+                            <h4 style="margin-top:0;">Symulacja Przebiegu Trasy</h4>
+                            <div id="tachoLog" class="tacho-timeline">
+                                <div style="padding:20px; text-align:center; color:#94a3b8;">Brak obliczonej trasy.</div>
+                            </div>
+                        </div>
+                        <div style="flex:1">
+                            <div class="settings-group">
+                                <h4>Podsumowanie Czasu</h4>
+                                <div style="display:flex; justify-content:space-between; margin-bottom:5px;">
+                                    <span>Jazda Netto:</span> <b id="resJazda">-</b>
+                                </div>
+                                <div style="display:flex; justify-content:space-between; margin-bottom:5px;">
+                                    <span>Pauzy Razem:</span> <b id="resPauzy">-</b>
+                                </div>
+                                <div style="margin-top:15px; border-top:1px solid #e2e8f0; padding-top:10px;">
+                                    <small>Szacowany dojazd (ETA):</small><br>
+                                    <span id="resArrival" style="font-size:18px; font-weight:700; color:var(--primary)">-</span>
+                                </div>
+                                <div id="resStatus" style="margin-top:10px;"></div>
+                            </div>
+                            <div id="riskAlertContainer" style="display:none;"></div>
+                        </div>
+                    </div>
+                </div>
+
+            </div>
+        </div>
+    </div>
+</div>
+
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Sortable/1.15.0/Sortable.min.js"></script>
+
+<script>
+/* ---------------- KONFIGURACJA ---------------- */
+const ORS_API_KEY = "eyJvcmciOiI1YjNjZTM1OTc4NTExMTAwMDFjZjYyNDgiLCJpZCI6ImQxOWE4ZDA2Y2Y1OTRmYjdhZWY3MjQ1OTEwMTNhNzRmIiwiaCI6Im11cm11cjY0In0=";
+const FIXED_SPEED = 67; 
+const EURO_CODES_STR = "pl,de,fr,es,pt,it,gb,ie,be,nl,lu,ch,at,cz,sk,hu,si,hr,ba,rs,me,xk,mk,al,gr,bg,ro,md,ua,by,lt,lv,ee,fi,se,no,dk";
+const EURO_CODES = EURO_CODES_STR.split(',');
+
+let routingSegments = [];
+let pointMarkers = [];
+let totalKm = 0;
+let tempDragMarker = null;
+let isRouteDragActive = false;
+let geoCache = {};
+
+// --- INITIALIZATION ---
+const map = L.map('map', { zoomControl: false }).setView([52.0, 19.0], 5);
+L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { maxZoom: 19 }).addTo(map);
+L.control.zoom({ position: 'topright' }).addTo(map);
+
+function debounce(fn, t = 300){ let timer; return (...args)=>{ clearTimeout(timer); timer = setTimeout(()=>fn(...args), t); }; }
+function formatHours(h){ if(isNaN(h)) return "0h 0m"; const hh=Math.floor(h); const mm=Math.round((h%1)*60); return `${hh}h ${mm}m`; }
+function formatDateTime(d){ const opt = { weekday: 'short', month: 'numeric', day: 'numeric' }; return d.toLocaleDateString('pl-PL', opt); }
+
+// Load Settings
+function loadSettings() {
+    if(localStorage.getItem('stawkaKm')) document.getElementById('stawkaKm').value = localStorage.getItem('stawkaKm');
+    if(localStorage.getItem('stawkaDzienna')) document.getElementById('stawkaDzienna').value = localStorage.getItem('stawkaDzienna');
+}
+function saveSettings() {
+    localStorage.setItem('stawkaKm', document.getElementById('stawkaKm').value);
+    localStorage.setItem('stawkaDzienna', document.getElementById('stawkaDzienna').value);
+}
+
+window.addEventListener('load', ()=>{
+    loadSettings();
+    const today = new Date();
+    document.getElementById('dataZaladunku').valueAsDate = today;
+    const tomorrow = new Date(today); tomorrow.setDate(tomorrow.getDate() + 1);
+    const yyyy = tomorrow.getFullYear(); const mm = String(tomorrow.getMonth() + 1).padStart(2, '0'); const dd = String(tomorrow.getDate()).padStart(2, '0');
+    document.getElementById('dataRozladunku').value = `${yyyy}-${mm}-${dd}`;
+    
+    // Default Points
+    dodajPunktWstepny("Start / Baza");
+    dodajPunktWstepny("Rozładunek");
+    
+    initPointControls(); aktualizujNumeracje(); generujPauzy();
+});
+
+// UI TABS
+function switchTab(tabId) {
+    document.querySelectorAll('.tab-pane').forEach(el => el.classList.remove('active'));
+    document.querySelectorAll('.tab-btn').forEach(el => el.classList.remove('active'));
+    document.getElementById('tab-'+tabId).classList.add('active');
+    event.currentTarget.classList.add('active');
+}
+
+// --- LOGIC: POINTS & AUTOCOMPLETE ---
+function parseLocationInput(val) {
+    val = val.trim().toLowerCase();
+    let detectedCountry = null;
+    let query = val;
+
+    // Najpierw spróbuj rozpoznać i wyciągnąć kod kraju z początku lub końca (np. "nl 6041", "6041 nl")
+    const prefixMatch = val.match(/^([a-zA-Z]{2})[\s\-\/]*(.*)$/);
+    const suffixMatch = val.match(/^(.*?)[\s\-\/]*([a-zA-Z]{2})$/);
+
+    if (prefixMatch && EURO_CODES.includes(prefixMatch[1].toLowerCase())) {
+        detectedCountry = prefixMatch[1].toLowerCase();
+        query = prefixMatch[2];
+    } else if (suffixMatch && EURO_CODES.includes(suffixMatch[2].toLowerCase())) {
+        detectedCountry = suffixMatch[2].toLowerCase();
+        query = suffixMatch[1];
+    }
+
+    // Teraz sprawdź, czy pozostałe zapytanie to 4 cyfry (holenderski kod pocztowy)
+    // Uwzględnij również przypadek, gdy użytkownik wpisał tylko 4 cyfry (bez kraju)
+    const justDigits = query.replace(/\D/g, '');
+    const isFourDigitPostalCode = /^\d{4}$/.test(justDigits);
+
+    if (isFourDigitPostalCode) {
+        // Jeśli wykryto 4 cyfry i kraj to Holandia (lub nie podano kraju) - traktuj to jako kod pocztowy
+        if (detectedCountry === 'nl' || detectedCountry === null) {
+            return { country: 'nl', q: justDigits, isPostalCode: true };
+        }
+    }
+
+    // Dla 4-cyfrowych kodów bez kraju, traktuj jako priorytet dla NL, BE, LU, CH, AT (jak wcześniej)
+    const postalMatch4 = val.match(/^(\d{4})$/);
+    const postalMatch5 = val.match(/^(\d{5})$/);
+
+    if (postalMatch4) {
+        detectedCountry = 'postal_priority_4';
+        query = val;
+    } else if (postalMatch5) {
+        detectedCountry = 'postal_priority_5';
+        query = val;
+    }
+
+    return { country: detectedCountry, q: query, isPostalCode: false };
+}
+
+async function tryGeocodeByValue(val) {
+  if (!val || val.trim().length < 2) return null;
+  const cacheKey = val.toLowerCase();
+  if(geoCache[cacheKey]) return geoCache[cacheKey];
+
+  try {
+    const parsed = parseLocationInput(val);
+    let apiUrl;
+
+    // SPECJALNA OBSŁUGA DLA HOLENDERSKICH KODÓW POCZTOWYCH
+    if (parsed.isPostalCode && parsed.country === 'nl') {
+      // Użyj parametru postalcode dla precyzyjnego wyszukiwania kodów pocztowych
+      apiUrl = `https://nominatim.openstreetmap.org/search?format=json&limit=1&addressdetails=1&postalcode=${encodeURIComponent(parsed.q)}&countrycodes=nl`;
+    } 
+    // Standardowa logika dla innych przypadków
+    else if (parsed.country === 'postal_priority_4') {
+      apiUrl = `https://nominatim.openstreetmap.org/search?format=json&limit=1&addressdetails=1&q=${encodeURIComponent(parsed.q)}&countrycodes=nl,be,lu,ch,at`;
+    } else if (parsed.country === 'postal_priority_5') {
+      apiUrl = `https://nominatim.openstreetmap.org/search?format=json&limit=1&addressdetails=1&q=${encodeURIComponent(parsed.q)}&countrycodes=pl,de,fr,es,it`;
+    } else if (parsed.country) {
+      apiUrl = `https://nominatim.openstreetmap.org/search?format=json&limit=1&addressdetails=1&q=${encodeURIComponent(parsed.q)}&countrycodes=${parsed.country}`;
+    } else {
+      apiUrl = `https://nominatim.openstreetmap.org/search?format=json&limit=1&addressdetails=1&q=${encodeURIComponent(parsed.q)}&countrycodes=${EURO_CODES_STR}`;
+    }
+
+    const r = await fetch(apiUrl);
+    const arr = await r.json();
+    if(arr[0]) { 
+      geoCache[cacheKey] = arr[0]; 
+      return arr[0]; 
+    }
+  } catch(e){ console.error(e); }
+  return null;
+}
+
+async function reverseGeocode(lat, lon) {
+  const key = `${lat},${lon}`;
+  if(geoCache[key]) return geoCache[key];
+  try {
+    const r = await fetch(`https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lon}&zoom=14&addressdetails=0`);
+    const j = await r.json();
+    if (j && j.display_name) {
+        const name = j.display_name.split(',').slice(0,2).join(',').trim();
+        geoCache[key] = name; return name;
+    }
+  } catch(e){ console.warn(e); }
+  return null;
+}
+
+function setupAutocomplete(input) {
+  const wrapper = input.closest('.punkty-container');
+  let dropdown = wrapper.querySelector('.autocomplete-suggestions');
+  if(!dropdown) { dropdown = document.createElement('div'); dropdown.className='autocomplete-suggestions'; dropdown.style.display='none'; wrapper.appendChild(dropdown); }
+  
+  input.addEventListener('input', debounce(async ()=>{
+    const val = input.value.trim();
+    dropdown.innerHTML = ''; dropdown.style.display = 'none';
+    delete input.dataset.lat; delete input.dataset.lon;
+    if (val.length < 2) return;
+    
+    try {
+      const parsed = parseLocationInput(val);
+      let apiUrl;
+
+      // SPECJALNA OBSŁUGA AUTOCOMPLETE DLA KODÓW POCZTOWYCH
+      if (parsed.isPostalCode && parsed.country === 'nl') {
+        // Dla kodów pocztowych również używamy parametru postalcode
+        apiUrl = `https://nominatim.openstreetmap.org/search?format=json&limit=5&addressdetails=1&postalcode=${encodeURIComponent(parsed.q)}&countrycodes=nl`;
+      }
+      // Standardowa logika dla innych przypadków
+      else if (parsed.country === 'postal_priority_4') {
+        apiUrl = `https://nominatim.openstreetmap.org/search?format=json&limit=5&addressdetails=1&q=${encodeURIComponent(parsed.q)}&countrycodes=nl,be,lu,ch,at`;
+      } else if (parsed.country === 'postal_priority_5') {
+        apiUrl = `https://nominatim.openstreetmap.org/search?format=json&limit=5&addressdetails=1&q=${encodeURIComponent(parsed.q)}&countrycodes=pl,de,fr,es,it`;
+      } else if (parsed.country) {
+        apiUrl = `https://nominatim.openstreetmap.org/search?format=json&limit=5&addressdetails=1&q=${encodeURIComponent(parsed.q)}&countrycodes=${parsed.country}`;
+      } else {
+        apiUrl = `https://nominatim.openstreetmap.org/search?format=json&limit=5&addressdetails=1&q=${encodeURIComponent(parsed.q)}&countrycodes=${EURO_CODES_STR}`;
+      }
+
+      const resp = await fetch(apiUrl);
+      const results = await resp.json();
+      
+      results.forEach(r => {
+        const div = document.createElement('div');
+        div.className = 'autocomplete-suggestion';
+        div.innerHTML = `<i class="fa-solid fa-location-dot" style="color:#94a3b8; margin-right:5px;"></i> ${r.display_name}`;
+        div.onclick = () => {
+          input.value = r.display_name; input.dataset.lat = r.lat; input.dataset.lon = r.lon;
+          dropdown.innerHTML = ''; dropdown.style.display = 'none';
+          input.style.borderColor = "var(--success)";
+          updateRoute();
+        };
+        dropdown.appendChild(div);
+      });
+      if (results.length) dropdown.style.display = 'block';
+    } catch(e){ console.error(e); }
+  }), 300);
+
+  // Hide on click outside
+  document.addEventListener('click', e => { if (!wrapper.contains(e.target)) dropdown.style.display = 'none'; });
+}
+
+function initPointControls() {
+  document.querySelectorAll('.punktInput').forEach(inp=>{ if (!inp.dataset._autocomplete) { setupAutocomplete(inp); inp.dataset._autocomplete = "1"; } });
+  document.querySelectorAll('.btn-remove').forEach(btn=>{
+    if (!btn.dataset._handled) {
+      btn.addEventListener('click', e=>{ e.target.closest('.punkty-container').remove(); aktualizujNumeracje(); updateRoute(); });
+      btn.dataset._handled = "1";
+    }
+  });
+}
+
+Sortable.create(document.getElementById("punktyWrapper"), { 
+    animation: 150, handle: ".drag-handle", filter: ".punktInput", preventOnFilter: false, onEnd: ()=>{ aktualizujNumeracje(); updateRoute(); } 
+});
+
+function aktualizujNumeracje(){
+  const wrappers = document.querySelectorAll('#punktyWrapper .punkty-container');
+  wrappers.forEach((w,i)=>{
+    const lbl = w.querySelector('label');
+    if (lbl) {
+      if (i === 0) lbl.textContent = `1. START / BAZA`;
+      else if (i === wrappers.length - 1) lbl.textContent = `${i+1}. ROZŁADUNEK`;
+      else lbl.textContent = `${i+1}. PUNKT POŚREDNI`;
+    }
+  });
+}
+
+function dodajPunktWstepny(labelTxt){
+  const wrapper = document.getElementById('punktyWrapper');
+  const div = document.createElement('div');
+  div.className = 'punkty-container';
+  div.innerHTML = `<label>${labelTxt}</label><div class="input-row"><span class="drag-handle"><i class="fa-solid fa-bars"></i></span><input type="text" class="punktInput" placeholder="Miasto, Kod..." autocomplete="off"><button type="button" class="btn-remove"><i class="fa-solid fa-times"></i></button></div>`;
+  wrapper.appendChild(div);
+}
+
+function dodajPunkt(){
+  dodajPunktWstepny("Punkt Pośredni");
+  initPointControls(); aktualizujNumeracje();
+}
+
+function generujPauzy(){
+  const liczba = parseInt(document.getElementById("liczbaPauz").value) || 0;
+  const kont = document.getElementById("listaPauzContainer");
+  kont.innerHTML = '';
+  for (let i=1;i<=liczba;i++){
+    const inp = document.createElement('input');
+    inp.type = "number"; inp.id = `manualPauza${i}`; inp.placeholder = `Pauza ${i} (h)`; inp.style.width = "100px";
+    inp.addEventListener('input', obliczAutomatycznie); 
+    kont.appendChild(inp);
+  }
+}
+
+// --- ROUTING ENGINE ---
+async function updateRoute(){
+  const inputs = Array.from(document.querySelectorAll('.punktInput'));
+  const coords = [];
+  
+  if (inputs.length < 2) return;
+
+  // Show loading
+  document.getElementById('loadingOverlay').style.display = 'flex';
+  
+  // Cleanup
+  routingSegments.forEach(r=>r.remove()); routingSegments = [];
+  pointMarkers.forEach(m=>m.remove()); pointMarkers = [];
+
+  const missing = [];
+  for (let i=0;i<inputs.length;i++){
+    const inp = inputs[i];
+    if(inp.value && (!inp.dataset.lat || !inp.dataset.lon)) {
+        const geo = await tryGeocodeByValue(inp.value);
+        if(geo) { inp.dataset.lat = geo.lat; inp.dataset.lon = geo.lon; inp.value = geo.display_name; inp.style.borderColor="var(--success)"; }
+    }
+    const lat = inp.dataset.lat, lon = inp.dataset.lon;
+    if (!lat || !lon) { missing.push(i+1); continue; }
+    coords.push([parseFloat(lon), parseFloat(lat)]);
+    
+    const marker = L.marker([lat, lon], { draggable:true }).addTo(map);
+    marker.bindTooltip(`${i+1}`, {permanent: true, direction: 'top', className:'map-label'});
+    marker.pointIndex = i;
+    marker.on('dragend', async function(){
+       const idx = this.pointIndex; const ll = this.getLatLng();
+       const inputEl = document.querySelectorAll('.punktInput')[idx];
+       if(inputEl){
+         inputEl.dataset.lat = ll.lat; inputEl.dataset.lon = ll.lng;
+         const name = await reverseGeocode(ll.lat, ll.lng);
+         if(name) inputEl.value = name;
+         updateRoute();
+       }
+    });
+    pointMarkers.push(marker);
+  }
+
+  if (missing.length > 0 || coords.length < 2) {
+    document.getElementById('loadingOverlay').style.display = 'none';
+    return;
+  }
+
+  const avoidCH = document.getElementById("avoidCH").checked;
+  const body = { coordinates: coords, options: avoidCH ? { avoid_countries:["CHE"] } : {} };
+
+  try {
+    const res = await fetch("https://api.openrouteservice.org/v2/directions/driving-car/geojson", {
+      method: "POST", headers: { "Authorization": ORS_API_KEY, "Content-Type": "application/json" }, body: JSON.stringify(body)
+    });
+    
+    if (!res.ok) throw new Error("API Error");
+    
+    const data = await res.json();
+    if (!data.features || !data.features[0]) throw new Error("No Route");
+
+    const routeCoords = data.features[0].geometry.coordinates.map(c => [c[1], c[0]]);
+    const poly = L.polyline(routeCoords, { color: "#2563eb", weight:5, opacity:0.8 }).addTo(map);
+    routingSegments.push(poly);
+    map.fitBounds(poly.getBounds().pad(0.2));
+    attachRouteDragHandlers(poly);
+
+    const props = data.features[0].properties;
+    
+    let calculatedDist = 0;
+    let segmentsHtml = '';
+    
+    // --- SEGMENTS CALCULATION ---
+    if (props.segments) {
+        props.segments.forEach((s, idx) => {
+             calculatedDist += s.distance;
+             // Calculate segment details
+             const segKm = s.distance / 1000;
+             const segTime = segKm / FIXED_SPEED;
+             segmentsHtml += `
+             <div class="segment-row">
+                <span>${idx+1} ➝ ${idx+2}</span>
+                <span>${segKm.toFixed(1)} km (${formatHours(segTime)})</span>
+             </div>
+             `;
+        });
+    } else if (props.summary) {
+        calculatedDist = props.summary.distance;
+    }
+    
+    totalKm = calculatedDist / 1000;
+    let totalTimeH = totalKm / FIXED_SPEED;
+    
+    // Update UI
+    document.getElementById("displayTotalKm").textContent = `${totalKm.toFixed(1)} km`;
+    document.getElementById("displayTotalTime").textContent = `${formatHours(totalTimeH)}`;
+    document.getElementById("segmentList").innerHTML = segmentsHtml; 
+    document.getElementById("mainSummary").style.display = "flex"; 
+    
+    obliczAutomatycznie();
+  } catch(e){ console.error(e); alert("Nie udało się wyznaczyć trasy. Sprawdź punkty."); }
+  
+  document.getElementById('loadingOverlay').style.display = 'none';
+}
+
+function pointToSegmentDistance(latlng, p1, p2) {
+  const x = latlng.lng, y = latlng.lat; const x1=p1[1], y1=p1[0], x2=p2[1], y2=p2[0];
+  const A = x - x1, B = y - y1, C = x2 - x1, D = y2 - y1;
+  const dot = A * C + B * D; const len_sq = C * C + D * D;
+  let param = -1; if (len_sq != 0) param = dot / len_sq;
+  let xx, yy;
+  if (param < 0) { xx = x1; yy = y1; } else if (param > 1) { xx = x2; yy = y2; } else { xx = x1 + param * C; yy = y1 + param * D; }
+  const dx = x - xx; const dy = y - yy; return Math.sqrt(dx * dx + dy * dy);
+}
+
+function insertPunktInputAt(index, lat, lon, displayName) {
+  const wrapper = document.getElementById('punktyWrapper');
+  const nodes = wrapper.querySelectorAll('.punkty-container');
+  const div = document.createElement('div');
+  div.className = 'punkty-container';
+  div.innerHTML = `<label>Punkt (Nowy)</label><div class="input-row"><span class="drag-handle"><i class="fa-solid fa-bars"></i></span><input type="text" class="punktInput" placeholder="Nowy..." autocomplete="off"><button type="button" class="btn-remove"><i class="fa-solid fa-times"></i></button></div>`;
+  if (nodes[index]) wrapper.insertBefore(div, nodes[index]); else wrapper.appendChild(div);
+  const input = div.querySelector('.punktInput');
+  input.dataset.lat = lat; input.dataset.lon = lon; input.value = displayName || 'Trasa';
+  initPointControls(); aktualizujNumeracje();
+}
+
+function attachRouteDragHandlers(polyline){
+  map.off('mousemove', window._rMm); map.off('mouseup', window._rMu);
+  let draggingMap = false;
+  
+  const onMd = (e) => { isRouteDragActive = true; draggingMap = map.dragging.enabled(); if(draggingMap) map.dragging.disable(); if(!tempDragMarker) tempDragMarker=L.circleMarker(e.latlng,{radius:8,color:'var(--accent)',fillColor:'white',fillOpacity:1}).addTo(map); else tempDragMarker.setLatLng(e.latlng); L.DomEvent.stopPropagation(e); };
+  const onMm = (e) => { if(isRouteDragActive && tempDragMarker) tempDragMarker.setLatLng(e.latlng); };
+  const onMu = async (e) => {
+     if(!isRouteDragActive) return; isRouteDragActive=false; if(draggingMap) map.dragging.enable();
+     const ll = tempDragMarker.getLatLng(); map.removeLayer(tempDragMarker); tempDragMarker=null;
+     const inputs = Array.from(document.querySelectorAll('.punktInput'));
+     const wps = []; inputs.forEach(inp=>{ if(inp.dataset.lat) wps.push([parseFloat(inp.dataset.lat), parseFloat(inp.dataset.lon)]); });
+     let best=0, min=Infinity;
+     for(let i=0; i<wps.length-1; i++){ const d=pointToSegmentDistance(ll, wps[i], wps[i+1]); if(d<min){min=d; best=i;} }
+     const name = await reverseGeocode(ll.lat, ll.lng);
+     insertPunktInputAt(best+1, ll.lat, ll.lng, name);
+     setTimeout(updateRoute, 200);
+  };
+  window._rMm=onMm; window._rMu=onMu;
+  polyline.on('mousedown', onMd); map.on('mousemove', onMm); map.on('mouseup', onMu);
+}
+
+// --- TACHO & COSTS CALCULATION ---
+function obliczAutomatycznie(){
+    if (totalKm <= 0.001) return;
+
+    // Inputs
+    const kmStawka = parseFloat(document.getElementById("stawkaKm").value) || 0;
+    const dayStawka = parseFloat(document.getElementById("stawkaDzienna").value) || 0;
+    
+    const dataZalVal = document.getElementById("dataZaladunku").value;
+    const dataRozVal = document.getElementById("dataRozladunku").value;
+    const dataStartInput = dataZalVal ? new Date(dataZalVal) : new Date();
+    const godzStart = document.getElementById("godzinaZaladunku").value || "12:00";
+    const godzCel = document.getElementById("godzinaRozladunku").value || "08:00";
+    
+    const weekendPauzaInput = parseFloat(document.getElementById("weekendPauza").value) || 24;
+    const valCzasDzien = document.getElementById("pozostalyCzasDzien").value;
+    let czasJazdyDzien = (valCzasDzien === "") ? 9.0 : parseFloat(valCzasDzien);
+    const limit10hVal = document.getElementById("liczba10hTyg").value;
+    let limit10h = (limit10hVal === "") ? 2 : parseInt(limit10hVal);
+    let limit2tyg = parseFloat(document.getElementById("jazda2tyg").value) || 80;
+
+    // Time Setup
+    const [hS, mS] = godzStart.split(":").map(Number);
+    let currentTime = new Date(dataStartInput); currentTime.setHours(hS, mS, 0, 0);
+    const startTimeInitial = new Date(currentTime);
+
+    let czasDoPrzejechania = totalKm / FIXED_SPEED;
+    let totalJazda = 0; let totalPauzy = 0;
+    let logHtml = [];
+    let dzienSymulacji = 1; let skroconePauzy = 0; let liczbaPauzDobowych = 0; 
+    let riskDetected = false; let riskType = "normal"; let riskBuffer = 0; let riskyDay = 0;
+    
+    // NEW FLAGS
+    let highRisk8h = false; 
+
+    // LOG: Start
+    logHtml.push(`<div class="log-entry"><span><i class="fa-regular fa-flag"></i> START TRASY</span><span>${formatDateTime(currentTime)} ${currentTime.toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'})}</span></div>`);
+    
+    // Show Billing Start if not Sunday
+    if(currentTime.getDay() !== 0) {
+        logHtml.push(`<div class="log-entry bill"><span><i class="fa-solid fa-file-invoice-dollar"></i> NALICZENIE DNIÓWKI</span><span>Dzień ${dzienSymulacji}</span></div>`);
+    }
+
+    let safetyCounter = 0;
+    while (czasDoPrzejechania > 0 && safetyCounter < 60) {
+        safetyCounter++;
+        // Weekend
+        if (currentTime.getDay() === 0) {
+             logHtml.push(`<div class="log-entry rest"><span><i class="fa-solid fa-bed"></i> PAUZA WEEKEND</span><span>${weekendPauzaInput}h</span></div>`);
+             totalPauzy += weekendPauzaInput;
+             currentTime = new Date(currentTime.getTime() + weekendPauzaInput * 3600000);
+             dzienSymulacji++; 
+             
+             // NEW: If next day is work, log billing
+             if(czasDoPrzejechania > 0) {
+                logHtml.push(`<div class="log-entry bill"><span><i class="fa-solid fa-file-invoice-dollar"></i> NALICZENIE DNIÓWKI</span><span>Dzień ${dzienSymulacji}</span></div>`);
+             }
+             continue;
+        }
+        // Next days limits
+        if (dzienSymulacji > 1) {
+            czasJazdyDzien = 9.0;
+            if (limit10h > 0 && czasDoPrzejechania > 9.0 && (totalJazda + 10 <= limit2tyg)) czasJazdyDzien = 10.0;
+        }
+        // Force Pause if 0h left
+        if (dzienSymulacji === 1 && czasJazdyDzien <= 0.01) {
+            logHtml.push(`<div class="log-entry rest"><span><i class="fa-solid fa-moon"></i> PAUZA DOBOWA (Brak czasu)</span><span>9h</span></div>`);
+            currentTime = new Date(currentTime.getTime() + 9 * 3600000); totalPauzy += 9; 
+            dzienSymulacji++; 
+            // Log bill next day
+            if(currentTime.getDay() !== 0) logHtml.push(`<div class="log-entry bill"><span><i class="fa-solid fa-file-invoice-dollar"></i> NALICZENIE DNIÓWKI</span><span>Dzień ${dzienSymulacji}</span></div>`);
+            continue; 
+        }
+
+        // Drive calc
+        let jazdaTeraz = Math.min(czasJazdyDzien, czasDoPrzejechania);
+        if (jazdaTeraz <= 0.01) break; 
+        
+        // Risk check
+        const tripEndsToday = (czasDoPrzejechania - jazdaTeraz <= 0.01);
+        let limitDoRyzyka = (dzienSymulacji===1)?czasJazdyDzien : ((limit10h>0)?10.0:9.0);
+        
+        if (tripEndsToday) {
+            const zapas = limitDoRyzyka - jazdaTeraz;
+            
+            // NEW RISK LOGIC: > 8h
+            if (jazdaTeraz > 8.0) {
+                highRisk8h = true;
+                riskDetected = true;
+                riskyDay = dzienSymulacji;
+                riskType = "high_risk_8h";
+            }
+            // Standard risk
+            else if (zapas < 2.0 && jazdaTeraz > 6.0) { 
+                riskDetected = true; riskyDay = dzienSymulacji; riskBuffer = zapas; riskType = "normal"; 
+            }
+        }
+
+        totalJazda += jazdaTeraz; czasDoPrzejechania -= jazdaTeraz;
+        if (jazdaTeraz > 9 && dzienSymulacji > 1) limit10h--;
+        
+        // 45min breaks
+        const p45 = Math.floor((jazdaTeraz - 0.01) / 4.5);
+        const czasP45 = p45 * 0.75;
+        totalPauzy += czasP45;
+        currentTime = new Date(currentTime.getTime() + (jazdaTeraz + czasP45) * 3600000);
+        
+        logHtml.push(`<div class="log-entry drive"><span><i class="fa-solid fa-truck-fast"></i> JAZDA (Dzień ${dzienSymulacji})</span><span>${formatHours(jazdaTeraz)} (+ ${p45}x 45min)</span></div>`);
+        
+        // Daily Rest
+        if (czasDoPrzejechania > 0) {
+            liczbaPauzDobowych++;
+            const manualInput = document.getElementById(`manualPauza${liczbaPauzDobowych}`);
+            let pauzaNocna = 0;
+            if (manualInput && manualInput.value) {
+                pauzaNocna = parseFloat(manualInput.value);
+                logHtml.push(`<div class="log-entry rest"><span><i class="fa-solid fa-hand"></i> PAUZA MANUALNA</span><span>${pauzaNocna}h</span></div>`);
+            } else {
+                if (skroconePauzy < 3) { pauzaNocna = 9; skroconePauzy++; logHtml.push(`<div class="log-entry rest"><span><i class="fa-solid fa-moon"></i> PAUZA SKRÓCONA</span><span>9h</span></div>`); } 
+                else { pauzaNocna = 11; logHtml.push(`<div class="log-entry rest"><span><i class="fa-solid fa-bed"></i> PAUZA REGULARNA</span><span>11h</span></div>`); }
+            }
+            totalPauzy += pauzaNocna;
+            currentTime = new Date(currentTime.getTime() + pauzaNocna * 3600000);
+            dzienSymulacji++;
+            
+            // Log bill next day
+            if(currentTime.getDay() !== 0) logHtml.push(`<div class="log-entry bill"><span><i class="fa-solid fa-file-invoice-dollar"></i> NALICZENIE DNIÓWKI</span><span>Dzień ${dzienSymulacji}</span></div>`);
+        }
+    }
+
+    logHtml.push(`<div class="log-entry" style="border-left-color:var(--text-main); background:#e2e8f0; font-weight:bold;"><span><i class="fa-solid fa-check-circle"></i> DOTARCIE DO CELU</span><span>${formatDateTime(currentTime)} ${currentTime.toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'})}</span></div>`);
+
+    // --- FINANCIALS ---
+    const startMidnight = new Date(startTimeInitial); startMidnight.setHours(0,0,0,0);
+    const endMidnight = new Date(currentTime); endMidnight.setHours(0,0,0,0);
+    
+    let targetDate = dataRozVal ? new Date(dataRozVal) : new Date(dataStartInput.getTime() + 86400000);
+    const [hT, mT] = godzCel.split(":").map(Number);
+    let targetFullDate = new Date(targetDate); targetFullDate.setHours(hT, mT, 0, 0);
+
+    if (currentTime > targetFullDate) { riskDetected = true; riskType = "late"; riskBuffer = (currentTime - targetFullDate) / 3600000; }
+
+    let costEndDate = (endMidnight > targetDate) ? endMidnight : targetDate;
+    const diffTime = new Date(costEndDate).setHours(0,0,0,0) - startMidnight;
+    let diffDays = Math.max(1, Math.round(diffTime / (86400000)));
+
+    let dniPlatne = diffDays;
+    let tempD = new Date(startMidnight);
+    for(let i=0; i < diffDays; i++) { if (tempD.getDay() === 0) dniPlatne--; tempD.setDate(tempD.getDate() + 1); }
+    if (dniPlatne < 1) dniPlatne = 1; 
+    
+    // Costs
+    const freightCost = totalKm * kmStawka;
+    const daysCost = dniPlatne * dayStawka;
+    const totalCost = freightCost + daysCost;
+    
+    // SAFE COST (Alternative)
+    const totalCostSafe = totalCost + dayStawka;
+
+    // Update UI
+    document.getElementById("daysCostDisplay").textContent = `${daysCost.toFixed(0)} €`;
+    document.getElementById("totalCostDisplay").textContent = `${totalCost.toFixed(2)} €`;
+
+    document.getElementById("tachoLog").innerHTML = logHtml.join('');
+    document.getElementById("resJazda").innerText = formatHours(totalJazda);
+    document.getElementById("resPauzy").innerText = formatHours(totalPauzy);
+    document.getElementById("resArrival").innerText = formatDateTime(currentTime) + " " + currentTime.toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'});
+    
+    let diff = (targetFullDate - currentTime) / 3600000; 
+    let status = (diff < 0) 
+        ? `<span style="color:var(--danger); font-weight:bold;"><i class="fa-solid fa-triangle-exclamation"></i> SPÓŹNIENIE: ${formatHours(Math.abs(diff))}</span>`
+        : `<span style="color:var(--success); font-weight:bold;"><i class="fa-solid fa-thumbs-up"></i> NA CZAS (Luz: ${formatHours(diff)})</span>`;
+    document.getElementById("resStatus").innerHTML = status;
+
+    const alertContainer = document.getElementById("riskAlertContainer");
+    if (riskDetected) {
+        alertContainer.style.display = "block";
+        let title, msg, cls;
+        
+        if (riskType === "late") {
+            cls = "risk-alert late"; title = "SPÓŹNIENIE"; 
+            msg = `Kierowca dojedzie <b>${formatHours(riskBuffer)}</b> po terminie.`;
+        } else if (riskType === "high_risk_8h") {
+            cls = "risk-alert high-risk"; title = "RYZYKO: OSTATNI DZIEŃ > 8h";
+            msg = `Dzień ${riskyDay} wymaga ponad <b>8 godzin</b> jazdy. Ryzyko, że kierowca nie dojedzie!<br><br>
+                   <div style="background:white; padding:8px; border-radius:4px; border:1px solid #fda4af;">
+                       Obecny koszt: <b>${totalCost.toFixed(2)} €</b><br>
+                       Opcja bezpieczna (+1 dzień): <b style="color:#16a34a">${totalCostSafe.toFixed(2)} €</b>
+                   </div>
+                   <div style="margin-top:5px; font-size:11px; opacity:0.8;">Sugerowana dopłata za extra dzień lub oddanie zlecenia.</div>`;
+        } else {
+            cls = "risk-alert"; title = "RYZYKO PRZEKROCZENIA CZASU"; 
+            msg = `Dzień ${riskyDay}: Jazda na styk. Zapas czasu to tylko <b>${formatHours(riskBuffer)}</b>.`;
+        }
+        alertContainer.className = cls;
+        alertContainer.innerHTML = `<strong><i class="fa-solid fa-triangle-exclamation"></i> ${title}</strong><br><div style="margin-top:5px;">${msg}</div>`;
+    } else {
+        alertContainer.style.display = "none";
+    }
+}
+</script>
+</body>
+</html>
